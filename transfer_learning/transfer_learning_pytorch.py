@@ -1,6 +1,7 @@
 # objective apply an advanced ImageNet pretrained network on the CIFAR-10 images
 # we will use both types of TL's
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import torch.nn as nn
@@ -170,15 +171,17 @@ def tl_fine_tuning(epochs=5):
     plot_accuracy(test_acc)
 
 
-def plot_accuracy(accuracy: list):
-    """Plot accuracy"""
-    plt.figure()
+def plot_accuracy(accuracy):
+
+    # Ensure accuracy is a CPU-based NumPy array
+    if isinstance(accuracy, torch.Tensor):
+        accuracy = accuracy.cpu().numpy()
+
     plt.plot(accuracy)
-    plt.xticks(
-        [i for i in range(0, len(accuracy))],
-        [i + 1 for i in range(0, len(accuracy))])
-    plt.ylabel('Accuracy')
+    plt.title('Accuracy over epochs')
     plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.grid()
     plt.show()
 
 
