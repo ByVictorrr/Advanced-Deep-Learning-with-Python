@@ -53,7 +53,8 @@ val_order = torch.utils.data.DataLoader(val_set,
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-# define the training of the model - iterates once over the whole training set (one epoch) and applies the optimizer after each forward pass
+# define the training of the model - iterates once over the whole training set (one epoch) and applies the optimizer
+# after each forward pass
 def train_model(model, loss_function, optimizer, data_loader):
     # set model to training mode
     model.train()

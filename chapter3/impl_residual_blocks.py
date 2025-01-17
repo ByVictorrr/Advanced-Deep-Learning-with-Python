@@ -240,15 +240,64 @@ def pre_activation_resnet_152():
                                num_blocks=[3, 8, 36, 3])
 
 
-def train_model(model, loss_function, optimizer, data_loader):
+def train_model(model, loss_function, optimizer, data_loader, device):
     """Train one epoch."""
     # set model in training mode
     model.train()
+    current_loss, current_acc = 0.0, 0
+    # iterate over the training data
+    for i, (inputs, labels) in enumerate(data_loader):
+        # send the inputs/labels to the GPU
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
+        with torch.set_grad_enabled(True):
+            # forward
+            outputs = model(inputs)
+            _, predictions = torch.max(outputs, 1)
+            loss = loss_function(outputs, labels)
+            # backward
+            loss.backward()
+            optimizer.step()
+        # statistics
+        current_loss += loss.item() * inputs.size(0)
+        current_acc += torch.sum(predictions == labels.data)
+    total_loss = current_loss / len(data_loader.dataset)
+    total_acc = current_acc.double() / len(data_loader.dataset)
+    print(f"Train Loss: {total_loss:.4f}")
+    print(f"Accuracy: {total_acc:.4f}")
 
 
-    pass
-def test_model(model, loss_function, data_loader):
-    pass
+# define the testing/validation of the model; skipping the backpropagation part
+def test_model(model, loss_function, data_loader, device):
+    # set model in evaluation mode
+    model.eval()
+    current_loss = 0.0
+    current_acc = 0
+    # iterate over the validation data
+    for i, (inputs, labels) in enumerate(data_loader):
+        # send the input/labels to the GPU
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # forward
+        with torch.set_grad_enabled(False):
+            outputs = model(inputs)
+            _, predictions = torch.max(outputs, 1)
+            loss = loss_function(outputs, labels)
+        # statistics
+        current_loss += loss.item() * inputs.size(0)
+        current_acc += torch.sum(predictions == labels.data)
+
+    total_loss = current_loss / len(data_loader.dataset)
+    total_acc = current_acc.double() / len(data_loader.dataset)
+    print(f"Train Loss: {total_loss:.4f}")
+    print(f"Accuracy: {total_acc:.4f}")
+    return total_loss, total_acc
+
+
 def plot_accuracy(accuracy: list):
     """Plot accuracy"""
     plt.figure()
@@ -259,5 +308,66 @@ def plot_accuracy(accuracy: list):
     plt.ylabel('Accuracy')
     plt.xlabel('Epoch')
     plt.show()
+
+
 if __name__ == "__main__":
+    # training data transformation
+    mean, std = (0.4914, 0.4821, 0.4465), (0.2470, 0.2435, 0.2616)
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=mean, std=std)
+    ])
+    # training data loader
+    train_set = torchvision.datasets.CIFAR10(
+        root="./data",
+        train=True,
+        download=True,
+        transform=transform_train
+    )
+    train_loader = torch.utils.data.DataLoader(
+        dataset=train_set,
+        batch_size=100,
+        shuffle=True,
+        num_workers=2,
+    )
+    # test data transformation
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=mean, std=std)
+    ])
+    # test data loader
+    testset = torchvision.datasets.CIFAR10(root="./data",
+                                           train=False,
+                                           download=True,
+                                           transform=transform_test)
+    test_loader = torch.utils.data.DataLoader(
+        dataset=testset,
+        batch_size=100,
+        shuffle=False,
+        num_workers=2
+    )
+    # init the net model and training parameters - entropy loss and adam optimizer
+    model = pre_activation_resnet_34()
+    # select gpu 0, if available otherwise cpu
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # transfer the model to the GPU
+    model = model.to(device)
+    # loss function
+    loss_function = nn.CrossEntropyLoss()
+    # we will optimize all parameters
+    optimizer = optim.Adam(model.parameters())
+
+    # train for EPOCHS
+    EPOCHS=15
+    test_acc = []
+    for epoch in range(EPOCHS):
+        print(f"epoch {epoch+1}/{EPOCHS}")
+        train_model(model, loss_function, optimizer, train_loader, device)
+        _, acc = test_model(model, loss_function, test_loader, device)
+        test_acc.append(acc)
+    plot_accuracy(test_acc)
+
+
     pass
