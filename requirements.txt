@@ -7,3 +7,4 @@ tensorflow-addons==0.6.0
 opencv-python >= 4.1.1
 nltk
 scikit-learn==1.0.2
+gensim
