@@ -1,3 +1,6 @@
+from collections import Counter, defaultdict
+
+import nltk
 import numpy as np
 
 import torch
@@ -43,46 +46,46 @@ class GloVe(nn.Module):
 
 
 def build_cooccurrence_matrix(tokenized_corpus, window_size=2):
-    vocab_size = len(vocab)
-    cooccurrence_matrix = np.zeros((vocab_size, vocab_size), dtype=np.float32)
+    cooccurrence_matrix = defaultdict(lambda: defaultdict(float))
 
     for sentence in tokenized_corpus:
         for i, word in enumerate(sentence):
+            if word not in word_to_id:
+                continue
             word_id = word_to_id[word]
+
             start = max(i - window_size, 0)
             end = min(i + window_size + 1, len(sentence))
 
             for j in range(start, end):
-                if i != j:
+                if i != j and sentence[j] in word_to_id:
                     neighbor_id = word_to_id[sentence[j]]
-                    cooccurrence_matrix[word_id, neighbor_id] += 1.0 / abs(j - i)
+                    cooccurrence_matrix[word_id][neighbor_id] += 1.0 / abs(j - i)
 
     return cooccurrence_matrix
 
-
 if __name__ == "__main__":
-    corpus = [
-        "I love deep learning",
-        "deep learning is amazing",
-        "machine learning is fun",
-        "natural language processing is exciting"
-    ]
+    import psutil
 
-    # Tokenizing the corpus
-    tokenized_corpus = [sentence.lower().split() for sentence in corpus]
+    print(f"Memory Usage: {psutil.virtual_memory().percent}%")
 
-    # Building the vocabulary
-    from collections import Counter
+    # Download web text corpus
+    nltk.download("webtext")
 
+    # Load and tokenize web text data
+    corpus = nltk.corpus.webtext.sents()[:5000]
+
+    # Convert to lowercase and filter non-alphabetic words
+    tokenized_corpus = [[word.lower() for word in sentence if word.isalpha()] for sentence in corpus]
+
+    # Limit vocabulary to top 3,000 words (very small)
     word_counts = Counter(word for sentence in tokenized_corpus for word in sentence)
-    vocab = list(word_counts.keys())
+    vocab = [word for word in word_counts.keys()] # Smaller vocab
+
     word_to_id = {word: i for i, word in enumerate(vocab)}
     id_to_word = {i: word for word, i in word_to_id.items()}
 
     cooccurrence_matrix = build_cooccurrence_matrix(tokenized_corpus, window_size=2)
-    X = cooccurrence_matrix
-    X[X == 0] = 1e-10  # Avoid log(0)
-    X_log = np.log(X)
     vocab_size = len(vocab)
     embedding_dim = 50
     epochs = 500
@@ -92,12 +95,11 @@ if __name__ == "__main__":
     context_indices = []
     cooccurrences = []
 
-    for i in range(vocab_size):
-        for j in range(vocab_size):
-            if cooccurrence_matrix[i, j] > 0:
-                word_indices.append(i)
-                context_indices.append(j)
-                cooccurrences.append(X_log[i, j] + 1e-10)
+    for word_id, neighbors in cooccurrence_matrix.items():
+        for context_id, count in neighbors.items():
+            word_indices.append(word_id)
+            context_indices.append(context_id)
+            cooccurrences.append(np.log(count + 1e-10))  # Prevent log(0)
 
     word_indices = torch.tensor(word_indices, dtype=torch.long)
     context_indices = torch.tensor(context_indices, dtype=torch.long)
@@ -147,7 +149,7 @@ if __name__ == "__main__":
 
 
     # Example usage
-    print("Similar words to 'learning':", find_similar_words("learning"))
+    print("Similar words to 'box':", find_similar_words("box"))
 
 
     def plot_embeddings(words):
