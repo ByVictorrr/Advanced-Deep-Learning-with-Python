@@ -8,3 +8,5 @@ opencv-python >= 4.1.1
 nltk
 scikit-learn==1.0.2
 gensim
+torchtext==0.4.0
+spacy==2.2.0
