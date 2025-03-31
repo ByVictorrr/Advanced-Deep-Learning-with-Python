@@ -3,3 +3,5 @@ yolov3.weights
 yolov3.cfg
 coco.names
 datasets/
+.data/
+.vector_cache/
